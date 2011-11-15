@@ -57,7 +57,7 @@ import org.codehaus.jackson.type.TypeReference;
  * CREATE EXTERNAL TABLE IF NOT EXISTS riak_bucket (key STRING, ts STRING, loc STRING, fxversion STRING, operatingsystem STRING, tpversion STRING, 
  *   event_headers ARRAY<STRING>, surveyanswers STRING, extensions MAP<STRING,BOOLEAN>, accessibilities MAP<STRING,STRING>, 
  *   preferences MAP<STRING,STRING>, events ARRAY<ARRAY<BIGINT>>) 
- *   ROW FORMAT SERDE 'com.mozilla.hive.serde.TestPilotJsonSerde' LOCATION '/path/to/riak_bucket';
+ *   ROW FORMAT SERDE 'com.mozilla.testpilot.hive.serde.TestPilotJsonSerde' LOCATION '/path/to/riak_bucket';
  *   
  * This code is based on <a href="http://code.google.com/p/hive-json-serde/">hive-json-serde on Google Code</a>. The key difference is this class 
  * uses Jackson JSON Processor to deserialize/serialize the JSON strings, and is coded much more specifically to TestPilot data since it
@@ -157,63 +157,52 @@ public class TestPilotJsonSerde implements SerDe {
 			// Metadata
 			if (tempValues.containsKey("metadata")) {
 				Map<String, Object> metadata = (Map<String,Object>)tempValues.get("metadata");
-				
-				values.put("event_headers", (List<String>)metadata.get("event_headers"));
-				values.put("loc", metadata.get("location"));
-				values.put("fxversion", metadata.get("fxVersion"));
-				values.put("operatingsystem", metadata.get("operatingSystem"));
-				values.put("tpversion", metadata.get("tpVersion"));
-				values.put("taskguid", metadata.get("task_guid"));
-				
-				StringWriter strWriter = new StringWriter();
-				jsonMapper.writeValue(strWriter, metadata.get("surveyAnswers"));
-				values.put("surveyanswers", strWriter.getBuffer().toString());
-				
-				values.put("engines", metadata.get("engines"));
-				values.put("bookmark_items", metadata.get("bookmarkItems"));
-				values.put("keyworded_bookmarks", metadata.get("keywordedBookmarks"));
-				values.put("testpilot", metadata.get("testpilot"));
-				values.put("usage", metadata.get("usage"));
-				values.put("providers", metadata.get("providers"));
-				
-				// Extensions
-				if (metadata.containsKey("extensions")) {
-					List<Object> extensions = (List<Object>)metadata.get("extensions");
-					Map<String,Boolean> extensionMap = new HashMap<String,Boolean>();
-					for (Object o : extensions) {
-						Map<String, Object> ex = (Map<String,Object>)o;
-						String id = (String)ex.get("id");
-						Boolean isEnabled = (Boolean)ex.get("isEnabled");
-						extensionMap.put(id, isEnabled);
-					}
-					values.put("extensions", extensionMap);
-				}
-				
-				// Accessibilities
-				if (metadata.containsKey("accessibilities")) {
-					List<Object> accessibilities = (List<Object>)metadata.get("accessibilities");
-					Map<String,String> accessibilityMap = new HashMap<String,String>();
-					for (Object o : accessibilities) {
-						Map<String, Object> a = (Map<String,Object>)o;
-						String name = (String)a.get("name");
-						// Get a string value of everything since we have mixed types
-						String v = String.valueOf(a.get("value"));
-						accessibilityMap.put(name, v);
-					}
-					values.put("accessibilities", accessibilityMap);
-				}
-				
-				// Hacky Preferences
 				Map<String,String> preferencesMap = new HashMap<String,String>();
+				
 				for (Map.Entry<String, Object> metaEntry : metadata.entrySet()) {
-					String metaKey = metaEntry.getKey();
-					if (metaKey.startsWith("Preference")) {
-						String name = metaKey.replace("Preference ", "");
-						preferencesMap.put(name, String.valueOf(metaEntry.getValue()));
-					} else if (metaKey.equals("Sync configured")) {
-						String name = "sync.configured";
-						preferencesMap.put(name, String.valueOf(metaEntry.getValue()));
-					}
+				    String key = metaEntry.getKey();
+				    Object vo = metaEntry.getValue();
+				    // Extensions
+				    if ("extensions".equals(key)) {
+				        List<Object> extensions = (List<Object>)vo;
+	                    Map<String,Boolean> extensionMap = new HashMap<String,Boolean>();
+	                    for (Object o : extensions) {
+	                        Map<String, Object> ex = (Map<String,Object>)o;
+	                        String id = (String)ex.get("id");
+	                        Boolean isEnabled = (Boolean)ex.get("isEnabled");
+	                        extensionMap.put(id, isEnabled);
+	                    }
+	                    values.put("extensions", extensionMap);
+	                    
+	                // Accessibilities
+				    } else if ("accessiblities".equals(key)) {
+				        List<Object> accessibilities = (List<Object>)vo;
+	                    Map<String,String> accessibilityMap = new HashMap<String,String>();
+	                    for (Object o : accessibilities) {
+	                        Map<String, Object> a = (Map<String,Object>)o;
+	                        String name = (String)a.get("name");
+	                        // Get a string value of everything since we have mixed types
+	                        String v = String.valueOf(a.get("value"));
+	                        accessibilityMap.put(name, v);
+	                    }
+	                    values.put("accessibilities", accessibilityMap);
+	                // Hack preferences
+				    } else if (key.startsWith("Preference")) {
+				        String name = key.replace("Preference ", "");
+                        preferencesMap.put(name.toLowerCase(), String.valueOf(metaEntry.getValue()));
+				    } else if ("Sync configured".equals(key)) {
+				        preferencesMap.put("sync.configured", String.valueOf(metaEntry.getValue()));
+				    // Leave survey answers as a JSON value for now
+				    } else if ("surveyAnswers".equals(key)) {
+				        StringWriter strWriter = new StringWriter();
+		                jsonMapper.writeValue(strWriter, vo);
+		                values.put("surveyanswers", strWriter.getBuffer().toString());
+		            // location is a hive keyword
+				    } else if ("location".equals(key)) {
+				        values.put("loc", vo);
+				    } else {
+				        values.put(key.toLowerCase(), vo);
+				    }
 				}
 				
 				if (preferencesMap.size() > 0) {
