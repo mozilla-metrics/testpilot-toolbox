@@ -1,7 +1,13 @@
 register 'elephant-bird-2.1.8.jar';
 
-%declare SEQFILE_LOADER 'com.twitter.elephantbird.pig.load.SequenceFileLoader';
-%declare TEXT_CONVERTER 'com.twitter.elephantbird.pig.util.TextConverter';
+SET pig.logfile tespilot_export_study.log;
+/*
+SET default_parallel 8;
+SET pig.tmpfilecompression true;
+SET pig.tmpfilecompression.codec lzo;
+SET mapred.compress.map.output true;
+SET mapred.map.output.compression.codec org.apache.hadoop.io.compress.SnappyCodec;
+*/
 
 /* 
 Basic example to demonstrate reading testpilot data using pig with Elephant Bird's SequenceFileLoader 
