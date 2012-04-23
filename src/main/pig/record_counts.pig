@@ -1,4 +1,4 @@
-register 'elephant-bird-2.1.8.jar';
+register 'elephant-bird-2.2.0.jar';
 
 SET pig.logfile tespilot_record_counts.log;
 /*

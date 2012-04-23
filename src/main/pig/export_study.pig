@@ -1,6 +1,6 @@
-register 'elephant-bird-2.1.8.jar';
+register 'elephant-bird-2.2.0.jar';
 
-SET pig.logfile tespilot_export_study.log;
+SET pig.logfile testpilot_export_study.log;
 /*
 SET default_parallel 8;
 SET pig.tmpfilecompression true;
