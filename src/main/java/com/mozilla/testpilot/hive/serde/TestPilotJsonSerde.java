@@ -21,7 +21,6 @@
 package com.mozilla.testpilot.hive.serde;
 
 import java.io.IOException;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -49,14 +48,14 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
 /**
- * TestPilot JSON is currently stored in Riak first. It needs to exported to HDFS using RiakExportToHDFS.
+ * TestPilot JSON is currently stored by Bagheera into HDFS.
  * 
- * Then you can create a table like so:
+ * You can create a table like so (EXTERNAL only please):
  * 
- * CREATE EXTERNAL TABLE IF NOT EXISTS riak_bucket (key STRING, ts STRING, loc STRING, fxversion STRING, operatingsystem STRING, tpversion STRING, 
+ * CREATE EXTERNAL TABLE IF NOT EXISTS study (key STRING, ts STRING, loc STRING, fxversion STRING, operatingsystem STRING, tpversion STRING, 
  *   event_headers ARRAY<STRING>, surveyanswers STRING, extensions MAP<STRING,BOOLEAN>, accessibilities MAP<STRING,STRING>, 
  *   preferences MAP<STRING,STRING>, events ARRAY<ARRAY<BIGINT>>) 
- *   ROW FORMAT SERDE 'com.mozilla.testpilot.hive.serde.TestPilotJsonSerde' LOCATION '/path/to/riak_bucket';
+ *   ROW FORMAT SERDE 'com.mozilla.testpilot.hive.serde.TestPilotJsonSerde' LOCATION '/path/to/study';
  *   
  * This code is based on <a href="http://code.google.com/p/hive-json-serde/">hive-json-serde on Google Code</a>. The key difference is this class 
  * uses Jackson JSON Processor to deserialize/serialize the JSON strings, and is coded much more specifically to TestPilot data since it
@@ -163,15 +162,15 @@ public class TestPilotJsonSerde implements SerDe {
 	                    values.put("extensions", extensionMap);
 	                    
 	                // Accessibilities
-				    } else if ("accessiblities".equals(key)) {
+				    } else if ("accessibilities".equals(key)) {
 				        List<Object> accessibilities = (List<Object>)vo;
 	                    Map<String,String> accessibilityMap = new HashMap<String,String>();
 	                    for (Object o : accessibilities) {
-	                        Map<String, Object> a = (Map<String,Object>)o;
-	                        String name = (String)a.get("name");
-	                        // Get a string value of everything since we have mixed types
-	                        String v = String.valueOf(a.get("value"));
-	                        accessibilityMap.put(name, v);
+                            Map<String, Object> a = (Map<String,Object>)o;
+                            String name = (String)a.get("name");
+                            // Get a string value of everything since we have mixed types
+                            String v = String.valueOf(a.get("value"));
+                            accessibilityMap.put(name, v);
 	                    }
 	                    values.put("accessibilities", accessibilityMap);
 	                // Hack preferences
@@ -182,9 +181,7 @@ public class TestPilotJsonSerde implements SerDe {
 				        preferencesMap.put("sync.configured", String.valueOf(metaEntry.getValue()));
 				    // Leave survey answers as a JSON value for now
 				    } else if ("surveyAnswers".equals(key)) {
-				        StringWriter strWriter = new StringWriter();
-		                jsonMapper.writeValue(strWriter, vo);
-		                values.put("surveyanswers", strWriter.getBuffer().toString());
+		                values.put("surveyanswers", jsonMapper.writeValueAsString(vo));
 		            // location is a hive keyword
 				    } else if ("location".equals(key)) {
 				        values.put("loc", vo);
@@ -270,9 +267,8 @@ public class TestPilotJsonSerde implements SerDe {
 	 */
 	@Override
 	public Writable serialize(Object obj, ObjectInspector objInspector) throws SerDeException {
-		StringWriter strWriter = new StringWriter();
 		try {
-			jsonMapper.writeValue(strWriter, obj);
+			serializedOutputValue.set(jsonMapper.writeValueAsString(obj));
 		} catch (JsonGenerationException e) {
 			LOG.error("JSON generation exception occurred", e);
 			throw new SerDeException(e);
@@ -283,8 +279,6 @@ public class TestPilotJsonSerde implements SerDe {
 			LOG.error("IOException occurred", e);
 			throw new SerDeException(e);
 		}
-
-		serializedOutputValue.set(strWriter.getBuffer().toString());
 		
 		return serializedOutputValue;
 	}

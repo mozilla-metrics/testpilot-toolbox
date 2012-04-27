@@ -15,7 +15,8 @@ Basic example to demonstrate reading testpilot data using pig with Elephant Bird
 */
 pairs = LOAD '/bagheera/$study/*' USING com.twitter.elephantbird.pig.load.SequenceFileLoader (
     '-c com.twitter.elephantbird.pig.util.TextConverter', 
-    '-c com.twitter.elephantbird.pig.util.TextConverter'
+    '-c com.twitter.elephantbird.pig.util.TextConverter',
+    '-skipEOFErrors'
 ) AS (key: chararray, json: chararray);
 
 STORE pairs INTO '$study-dump';
